@@ -1,0 +1,6 @@
+base_image: ubuntu:14.04
+organization: jeqo
+image_name: ubuntu
+tags:
+  - latest
+  - 14.04

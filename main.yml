@@ -1,0 +1,64 @@
+- hosts: 127.0.0.1
+  connection: local
+  vars_files:
+    - vars/main.yml
+  tasks:
+    - name: create container
+      docker_image:
+        path: base
+        name: base-ubuntu
+        state: build
+
+    - name: create container
+      docker:
+        name: tmp-ubuntu
+        image: base-ubuntu
+        command: sleep infinity
+        state: started
+
+    - add_host:
+        name: tmp-ubuntu
+        groups: docker
+        ansible_connection: docker
+
+- hosts: tmp-ubuntu
+  connection: docker
+  tasks:
+    - name: install packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - sudo
+
+    - name: configure sudoers
+      lineinfile:
+        dest: /etc/sudoers
+        regexp: '^Defaults    requiretty'
+        line: '#Defaults    requiretty'
+  post_tasks:
+    - name: clean apt temporal directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - /var/lib/apt/lists
+
+- hosts: 127.0.0.1
+  connection: local
+  vars_files:
+    - vars/main.yml
+  tasks:
+    - name: docker commit
+      command: "docker commit tmp-ubuntu {{ organization }}/{{ image_name }}:{{ item }}"
+      with_items: "{{ tags }}"
+
+    - name: docker push
+      command: "docker push {{ organization }}/{{ image_name }}:{{ item }}"
+      with_items: "{{ tags }}"
+
+    - name: docker kill
+      command: "docker kill tmp-ubuntu"
+
+    - name: docker rm
+      command: "docker rm tmp-ubuntu"
